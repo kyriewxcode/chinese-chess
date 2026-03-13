@@ -1,0 +1,212 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+}
+
+.container {
+    text-align: center;
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+}
+
+h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+h1 .chess-icon {
+    font-size: 1.2em;
+}
+
+.subtitle {
+    color: #aaa;
+    margin-bottom: 30px;
+    font-size: 0.9em;
+}
+
+/* ===== 菜单屏幕 ===== */
+#menu-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+#menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 280px;
+}
+
+.menu-btn {
+    padding: 14px 30px;
+    font-size: 1.1em;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+}
+
+.menu-btn:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.menu-btn .btn-icon {
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+/* ===== AI 选项面板 ===== */
+#ai-options, #online-options, #waiting-room {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    width: 300px;
+    margin: 0 auto;
+}
+
+.option-group {
+    width: 100%;
+    text-align: left;
+}
+
+.option-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #ccc;
+    font-size: 0.9em;
+}
+
+.option-group select, .option-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 1em;
+}
+
+.option-group select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+
+.option-group input::placeholder {
+    color: #888;
+}
+
+.btn-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.btn-row .menu-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 0.95em;
+}
+
+.btn-secondary {
+    background: transparent !important;
+    border-color: rgba(255,255,255,0.2) !important;
+}
+
+/* ===== 等待房间 ===== */
+.room-code {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #4fc3f7;
+    letter-spacing: 8px;
+    margin: 10px 0;
+    text-shadow: 0 0 20px rgba(79, 195, 247, 0.5);
+}
+
+.waiting-text {
+    color: #aaa;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ===== 游戏屏幕 ===== */
+#game-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+#chessBoard {
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    cursor: pointer;
+}
+
+#game-status {
+    font-size: 1.2em;
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    min-width: 200px;
+}
+
+.game-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.game-btn {
+    padding: 8px 20px;
+    font-size: 0.9em;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.game-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.game-btn.danger {
+    border-color: rgba(255,100,100,0.5);
+}
+
+.game-btn.danger:hover {
+    background: rgba(255,100,100,0.2);
+}
+
+#online-status {
+    color: #aaa;
+    font-size: 0.85em;
+    min-height: 20px;
+}
