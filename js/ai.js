@@ -811,63 +811,33 @@ ${movesText}
 {"from":[行,列],"to":[行,列],"reason":"简短理由"}`;
 
         try {
-            const isAnthropic = this.baseUrl.includes('anthropic.com');
-            let response;
-
-            if (isAnthropic) {
-                // Anthropic 原生 API
-                response = await fetch(this.baseUrl + '/v1/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': this.apiKey,
-                        'anthropic-version': '2023-06-01',
-                        'anthropic-dangerous-direct-browser-access': 'true'
-                    },
-                    body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
-                        max_tokens: 300,
-                        messages: [{ role: 'user', content: prompt }]
-                    })
-                });
-            } else {
-                // OpenAI 兼容格式（中转站、OpenRouter 等）
-                const url = this.baseUrl + '/v1/chat/completions';
-                response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.apiKey
-                    },
-                    body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
-                        max_tokens: 300,
-                        messages: [{ role: 'user', content: prompt }]
-                    })
-                });
-            }
+            // 通过服务端代理调用 API，避免 CORS 问题
+            const response = await fetch('/api/ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apiUrl: this.baseUrl,
+                    apiKey: this.apiKey,
+                    model: 'claude-sonnet-4-20250514',
+                    messages: [{ role: 'user', content: prompt }]
+                })
+            });
 
             if (!response.ok) {
-                console.error('API error:', response.status, await response.text());
+                const errText = await response.text();
+                console.error('API 代理错误:', response.status, errText);
                 this.thinking = false;
                 return null;
             }
 
             const data = await response.json();
-
-            // 兼容两种返回格式
-            let text;
-            if (data.content && data.content[0]) {
-                // Anthropic 格式
-                text = data.content[0].text.trim();
-            } else if (data.choices && data.choices[0]) {
-                // OpenAI 格式
-                text = data.choices[0].message.content.trim();
-            } else {
-                console.error('未知的返回格式:', data);
+            if (data.error) {
+                console.error('API 错误:', data.error);
                 this.thinking = false;
                 return null;
             }
+
+            const text = (data.text || '').trim();
 
             // 提取 JSON
             const jsonMatch = text.match(/\{[\s\S]*?\}/);
