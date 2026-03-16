@@ -31,10 +31,15 @@
                 <div class="option-group">
                     <label>选择难度</label>
                     <select id="ai-difficulty">
-                        <option value="easy">初级 — 适合新手</option>
-                        <option value="medium" selected>中级 — 有一定挑战</option>
-                        <option value="hard">高级 — 强力 AI</option>
+                        <option value="easy">初级 — 搜索3层</option>
+                        <option value="medium" selected>中级 — 搜索5层</option>
+                        <option value="hard">高级 — 搜索8层</option>
+                        <option value="claude">大模型 — Claude AI</option>
                     </select>
+                </div>
+                <div class="option-group" id="api-key-group" style="display:none">
+                    <label>Claude API Key</label>
+                    <input type="password" id="claude-api-key" placeholder="sk-ant-...">
                 </div>
                 <div class="option-group">
                     <label>选择阵营</label>

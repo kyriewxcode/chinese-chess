@@ -15,6 +15,7 @@ class ChessGame {
 
         this.renderer = null;
         this.ai = new ChessAI();
+        this.claudeAI = null;
         this.network = new NetworkManager();
 
         this.initUI();
@@ -29,6 +30,12 @@ class ChessGame {
         // AI 选项
         document.getElementById('btn-ai-start').addEventListener('click', () => this.startAI());
         document.getElementById('btn-ai-back').addEventListener('click', () => this.showMenu());
+
+        // 难度切换时显示/隐藏 API Key 输入
+        document.getElementById('ai-difficulty').addEventListener('change', (e) => {
+            document.getElementById('api-key-group').style.display =
+                e.target.value === 'claude' ? 'block' : 'none';
+        });
 
         // 联机选项
         document.getElementById('btn-create-room').addEventListener('click', () => this.createRoom());
@@ -94,6 +101,19 @@ class ChessGame {
         this.gameMode = 'ai';
         this.aiDifficulty = document.getElementById('ai-difficulty').value;
         this.playerSide = document.getElementById('ai-side').value;
+
+        // Claude 大模型模式
+        if (this.aiDifficulty === 'claude') {
+            const apiKey = document.getElementById('claude-api-key').value.trim();
+            if (!apiKey) {
+                alert('请输入 Claude API Key');
+                return;
+            }
+            this.claudeAI = new ClaudeChessAI(apiKey);
+        } else {
+            this.claudeAI = null;
+        }
+
         this.resetGame();
         this.showGame();
         this.initRenderer(this.playerSide === 'black');
@@ -108,12 +128,35 @@ class ChessGame {
 
     async aiMove() {
         if (this.gameOver) return;
-        this.updateStatus('AI 思考中...');
-        const move = await this.ai.think(this.board, this.currentTurn, this.aiDifficulty);
-        if (move && !this.gameOver) {
-            this.executeMove(move.from, move.to);
-        } else if (!move && !this.gameOver) {
-            this.updateStatus('AI 计算超时，请重试');
+
+        if (this.claudeAI) {
+            // Claude 大模型模式
+            this.updateStatus('Claude 思考中...');
+            const move = await this.claudeAI.think(this.board, this.currentTurn, 'claude');
+            if (move && !this.gameOver) {
+                if (move.reason) {
+                    this.updateStatus(`Claude: ${move.reason}`);
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+                this.claudeAI.recordMove(move.from, move.to);
+                this.executeMove(move.from, move.to);
+            } else if (!move && !this.gameOver) {
+                this.updateStatus('Claude 未返回有效走法，使用本地AI');
+                // 降级到本地 AI
+                const fallback = await this.ai.think(this.board, this.currentTurn, 'hard');
+                if (fallback && !this.gameOver) {
+                    this.executeMove(fallback.from, fallback.to);
+                }
+            }
+        } else {
+            // 本地 AI 模式
+            this.updateStatus('AI 思考中...');
+            const move = await this.ai.think(this.board, this.currentTurn, this.aiDifficulty);
+            if (move && !this.gameOver) {
+                this.executeMove(move.from, move.to);
+            } else if (!move && !this.gameOver) {
+                this.updateStatus('AI 计算超时，请重试');
+            }
         }
     }
 
@@ -267,6 +310,11 @@ class ChessGame {
         this.selectedPos = null;
         this.legalMoves = [];
 
+        // Claude AI 记录走棋
+        if (this.claudeAI && this.currentTurn === this.playerSide) {
+            this.claudeAI.recordMove(from, to);
+        }
+
         // 切换回合
         this.currentTurn = this.currentTurn === 'red' ? 'black' : 'red';
 
@@ -344,6 +392,10 @@ class ChessGame {
         this.network.disconnect();
         this.ai.destroy();
         this.ai = new ChessAI();
+        if (this.claudeAI) {
+            this.claudeAI.destroy();
+            this.claudeAI = null;
+        }
         document.getElementById('menu-buttons').style.display = 'flex';
         document.getElementById('ai-options').style.display = 'none';
         document.getElementById('online-options').style.display = 'none';
