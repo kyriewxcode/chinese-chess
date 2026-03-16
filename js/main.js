@@ -105,11 +105,16 @@ class ChessGame {
         // Claude 大模型模式
         if (this.aiDifficulty === 'claude') {
             const apiKey = document.getElementById('claude-api-key').value.trim();
+            const apiUrl = document.getElementById('claude-api-url').value.trim();
             if (!apiKey) {
-                alert('请输入 Claude API Key');
+                alert('请输入 API Key');
                 return;
             }
-            this.claudeAI = new ClaudeChessAI(apiKey);
+            if (!apiUrl) {
+                alert('请输入 API Base URL');
+                return;
+            }
+            this.claudeAI = new ClaudeChessAI(apiKey, apiUrl);
         } else {
             this.claudeAI = null;
         }

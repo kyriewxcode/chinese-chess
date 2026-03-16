@@ -737,8 +737,9 @@ self.onmessage = function(e) {
 // ==================== Claude 大模型 AI ====================
 
 class ClaudeChessAI {
-    constructor(apiKey) {
+    constructor(apiKey, baseUrl) {
         this.apiKey = apiKey;
+        this.baseUrl = (baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '');
         this.thinking = false;
         this.moveHistory = [];
     }
@@ -810,29 +811,63 @@ ${movesText}
 {"from":[行,列],"to":[行,列],"reason":"简短理由"}`;
 
         try {
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': this.apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true'
-                },
-                body: JSON.stringify({
-                    model: 'claude-sonnet-4-20250514',
-                    max_tokens: 300,
-                    messages: [{ role: 'user', content: prompt }]
-                })
-            });
+            const isAnthropic = this.baseUrl.includes('anthropic.com');
+            let response;
+
+            if (isAnthropic) {
+                // Anthropic 原生 API
+                response = await fetch(this.baseUrl + '/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': this.apiKey,
+                        'anthropic-version': '2023-06-01',
+                        'anthropic-dangerous-direct-browser-access': 'true'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 300,
+                        messages: [{ role: 'user', content: prompt }]
+                    })
+                });
+            } else {
+                // OpenAI 兼容格式（中转站、OpenRouter 等）
+                const url = this.baseUrl + '/v1/chat/completions';
+                response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiKey
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 300,
+                        messages: [{ role: 'user', content: prompt }]
+                    })
+                });
+            }
 
             if (!response.ok) {
-                console.error('Claude API error:', response.status);
+                console.error('API error:', response.status, await response.text());
                 this.thinking = false;
                 return null;
             }
 
             const data = await response.json();
-            const text = data.content[0].text.trim();
+
+            // 兼容两种返回格式
+            let text;
+            if (data.content && data.content[0]) {
+                // Anthropic 格式
+                text = data.content[0].text.trim();
+            } else if (data.choices && data.choices[0]) {
+                // OpenAI 格式
+                text = data.choices[0].message.content.trim();
+            } else {
+                console.error('未知的返回格式:', data);
+                this.thinking = false;
+                return null;
+            }
 
             // 提取 JSON
             const jsonMatch = text.match(/\{[\s\S]*?\}/);
