@@ -193,9 +193,25 @@ function findKing(board, side) {
     return null;
 }
 
+// 检查两个将帅是否面对面（飞将违规）
+function kingsAreFacing(board) {
+    const redKing = findKing(board, 'red');
+    const blackKing = findKing(board, 'black');
+    if (!redKing || !blackKing) return false;
+    if (redKing[1] !== blackKing[1]) return false; // 不在同一列
+    const minR = Math.min(redKing[0], blackKing[0]);
+    const maxR = Math.max(redKing[0], blackKing[0]);
+    for (let r = minR + 1; r < maxR; r++) {
+        if (board[r][redKing[1]] !== 0) return false; // 中间有棋子阻挡
+    }
+    return true; // 面对面，违规
+}
+
 function isCheck(board, side) {
     const kingPos = findKing(board, side);
     if (!kingPos) return true;
+    // 检查飞将：如果走棋后两将面对面，视为被将军
+    if (kingsAreFacing(board)) return true;
     const enemy = side === 'red' ? 'black' : 'red';
     for (let r = 0; r < 10; r++) {
         for (let c = 0; c < 9; c++) {
@@ -239,7 +255,13 @@ function getAllLegalMoves(board, side) {
 }
 
 function isCheckmate(board, side) {
-    return getAllLegalMoves(board, side).length === 0;
+    if (getAllLegalMoves(board, side).length > 0) return false;
+    return isCheck(board, side); // 被将军且无合法走法 = 将杀
+}
+
+function isStalemate(board, side) {
+    if (getAllLegalMoves(board, side).length > 0) return false;
+    return !isCheck(board, side); // 未被将军但无合法走法 = 困毙(和棋)
 }
 
 function makeMove(board, from, to) {

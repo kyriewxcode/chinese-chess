@@ -30,8 +30,12 @@ class NetworkManager {
                 };
 
                 this.ws.onmessage = (e) => {
-                    const msg = JSON.parse(e.data);
-                    this.handleMessage(msg);
+                    try {
+                        const msg = JSON.parse(e.data);
+                        this.handleMessage(msg);
+                    } catch (err) {
+                        console.error('消息解析失败:', err);
+                    }
                 };
 
                 this.ws.onclose = () => {

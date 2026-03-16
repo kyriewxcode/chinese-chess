@@ -112,6 +112,8 @@ class ChessGame {
         const move = await this.ai.think(this.board, this.currentTurn, this.aiDifficulty);
         if (move && !this.gameOver) {
             this.executeMove(move.from, move.to);
+        } else if (!move && !this.gameOver) {
+            this.updateStatus('AI 计算超时，请重试');
         }
     }
 
@@ -173,6 +175,15 @@ class ChessGame {
         this.network.on('opponent_disconnected', () => {
             this.updateStatus('对手已断开连接');
             this.gameOver = true;
+        });
+
+        this.network.on('game_over', (data) => {
+            const winnerName = data.winner === 'red' ? '红' : '黑';
+            const reason = data.reason === 'resign' ? '对手认输' : '';
+            this.updateStatus(`${winnerName}方胜！${reason}`);
+            this.gameOver = true;
+            this.render();
+            setTimeout(() => alert(`${winnerName}方胜利！${reason}`), 300);
         });
 
         this.network.on('error', (msg) => {
@@ -259,13 +270,21 @@ class ChessGame {
         // 切换回合
         this.currentTurn = this.currentTurn === 'red' ? 'black' : 'red';
 
-        // 检查将军/绝杀
+        // 检查将杀/困毙
         if (isCheckmate(this.board, this.currentTurn)) {
             const winner = this.currentTurn === 'red' ? '黑' : '红';
             this.updateStatus(`${winner}方胜！将杀！`);
             this.gameOver = true;
             this.render();
             setTimeout(() => alert(`${winner}方胜利！`), 300);
+            return;
+        }
+
+        if (isStalemate(this.board, this.currentTurn)) {
+            this.updateStatus('和棋！困毙！');
+            this.gameOver = true;
+            this.render();
+            setTimeout(() => alert('和棋！困毙！'), 300);
             return;
         }
 

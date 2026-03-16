@@ -7,7 +7,7 @@ const WebSocket = require('ws');
 const PORT = process.argv[2] || 3000;
 const wss = new WebSocket.Server({ port: PORT });
 
-const rooms = new Map(); // roomId -> { players: [ws1, ws2], sides: ['red', 'black'] }
+const rooms = new Map(); // roomId -> { players: [ws1, ws2], sides: ['red', 'black'], currentTurn: 'red' }
 
 function generateRoomId() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -56,7 +56,8 @@ wss.on('connection', (ws) => {
 
                 rooms.set(roomId, {
                     players: [ws],
-                    sides: ['red']
+                    sides: ['red'],
+                    currentTurn: 'red'
                 });
                 ws.roomId = roomId;
                 ws.playerSide = 'red';
@@ -93,6 +94,27 @@ wss.on('connection', (ws) => {
             }
 
             case 'move': {
+                const room = rooms.get(ws.roomId);
+                if (!room) break;
+                // 回合控制：只允许当前回合的玩家走棋
+                if (ws.playerSide !== room.currentTurn) {
+                    sendJSON(ws, { type: 'error', message: '不是你的回合' });
+                    break;
+                }
+                // 坐标范围验证
+                const { from, to } = msg;
+                if (!from || !to ||
+                    !Array.isArray(from) || !Array.isArray(to) ||
+                    from.length !== 2 || to.length !== 2 ||
+                    !Number.isInteger(from[0]) || !Number.isInteger(from[1]) ||
+                    !Number.isInteger(to[0]) || !Number.isInteger(to[1]) ||
+                    from[0] < 0 || from[0] > 9 || from[1] < 0 || from[1] > 8 ||
+                    to[0] < 0 || to[0] > 9 || to[1] < 0 || to[1] > 8) {
+                    sendJSON(ws, { type: 'error', message: '非法走法' });
+                    break;
+                }
+                // 切换回合
+                room.currentTurn = room.currentTurn === 'red' ? 'black' : 'red';
                 const opponent = getOpponent(ws.roomId, ws);
                 if (opponent) {
                     sendJSON(opponent, { type: 'move', from: msg.from, to: msg.to });
@@ -101,9 +123,11 @@ wss.on('connection', (ws) => {
             }
 
             case 'chat': {
-                const opponent = getOpponent(ws.roomId, ws);
-                if (opponent) {
-                    sendJSON(opponent, { type: 'chat', message: msg.message });
+                // 限制消息长度，防止滥用
+                if (typeof msg.message !== 'string' || msg.message.length > 500) break;
+                const chatOpponent = getOpponent(ws.roomId, ws);
+                if (chatOpponent) {
+                    sendJSON(chatOpponent, { type: 'chat', message: msg.message });
                 }
                 break;
             }
