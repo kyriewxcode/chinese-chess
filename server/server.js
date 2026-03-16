@@ -77,11 +77,16 @@ async function handleAIProxy(req, res) {
                     'x-api-key': apiKey,
                     'anthropic-version': '2023-06-01'
                 };
-                reqBody = JSON.stringify({
+                // Anthropic API: system 单独传，messages 只包含 user/assistant
+                const systemMsg = messages.find(m => m.role === 'system');
+                const chatMsgs = messages.filter(m => m.role !== 'system');
+                const body = {
                     model: model || 'claude-sonnet-4-20250514',
                     max_tokens: 500,
-                    messages: messages
-                });
+                    messages: chatMsgs
+                };
+                if (systemMsg) body.system = systemMsg.content;
+                reqBody = JSON.stringify(body);
             } else {
                 targetUrl = baseUrl + '/v1/chat/completions';
                 headers = {
@@ -96,6 +101,7 @@ async function handleAIProxy(req, res) {
             }
 
             console.log(`[AI] 代理请求 -> ${targetUrl}`);
+            console.log(`[AI] 模型: ${model}`);
 
             const response = await fetch(targetUrl, {
                 method: 'POST',
@@ -105,6 +111,17 @@ async function handleAIProxy(req, res) {
 
             const data = await response.text();
             console.log(`[AI] 响应状态: ${response.status}`);
+
+            // 非200响应，返回错误信息
+            if (!response.ok) {
+                console.error(`[AI] 错误响应: ${data.substring(0, 500)}`);
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                });
+                res.end(JSON.stringify({ error: `API返回${response.status}: ${data.substring(0, 200)}` }));
+                return;
+            }
 
             // 提取返回的文本内容
             let text = '';
@@ -121,7 +138,9 @@ async function handleAIProxy(req, res) {
                 text = data;
             }
 
-            res.writeHead(response.status, {
+            console.log(`[AI] 返回内容: ${text.substring(0, 100)}`);
+
+            res.writeHead(200, {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
             });

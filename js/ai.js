@@ -737,9 +737,10 @@ self.onmessage = function(e) {
 // ==================== Claude 大模型 AI ====================
 
 class ClaudeChessAI {
-    constructor(apiKey, baseUrl) {
+    constructor(apiKey, baseUrl, model) {
         this.apiKey = apiKey;
         this.baseUrl = (baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '');
+        this.model = model || 'claude-sonnet-4-20250514';
         this.thinking = false;
         this.moveHistory = [];
     }
@@ -784,88 +785,88 @@ class ClaudeChessAI {
             `(${m.from[0]},${m.from[1]})->(${m.to[0]},${m.to[1]})`
         ).join('; ');
 
-        const prompt = `你是一个中国象棋大师。请分析当前棋局并选择最佳走法。
+        const prompt = `中国象棋。行0-9上到下,列0-8左到右。上方(行0-2)黑方,下方(行7-9)红方。r=红,b=黑。
 
-棋盘坐标系：行0-9（上到下），列0-8（左到右）
-棋盘上方（行0-2）是黑方阵地，下方（行7-9）是红方阵地。
-r前缀=红方棋子，b前缀=黑方棋子。
-
-当前棋盘:
 ${boardText}
-
 走棋历史: ${this.formatMoveHistory()}
 
-你执${sideText}。
-
-所有合法走法:
+你执${sideText}。合法走法:
 ${movesText}
 
-请从以上合法走法中选择最佳的一步。考虑：
-1. 子力价值和交换
-2. 棋子活跃度和控制力
-3. 将帅安全
-4. 攻守平衡
-5. 战术组合（如抽将、捉双、牵制等）
+选最佳走法。严格只输出JSON，禁止输出任何其他文字:
+{"from":[行,列],"to":[行,列],"reason":"10字内理由"}`;
 
-请只回复一个JSON对象，格式如下，不要任何其他文字：
-{"from":[行,列],"to":[行,列],"reason":"简短理由"}`;
+        // 最多重试3次
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const response = await fetch('/api/ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apiUrl: this.baseUrl,
+                        apiKey: this.apiKey,
+                        model: this.model,
+                        messages: [
+                            { role: 'system', content: '你是象棋AI。只输出JSON，不要分析，不要解释，不要多余文字。' },
+                            { role: 'user', content: prompt }
+                        ]
+                    })
+                });
 
-        try {
-            // 通过服务端代理调用 API，避免 CORS 问题
-            const response = await fetch('/api/ai', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    apiUrl: this.baseUrl,
-                    apiKey: this.apiKey,
-                    model: 'claude-sonnet-4-20250514',
-                    messages: [{ role: 'user', content: prompt }]
-                })
-            });
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error(`API 代理错误(尝试${attempt+1}):`, response.status, errText);
+                    this.lastError = `HTTP ${response.status}: ${errText}`;
+                    continue;
+                }
 
-            if (!response.ok) {
-                const errText = await response.text();
-                console.error('API 代理错误:', response.status, errText);
-                this.thinking = false;
-                return null;
+                const data = await response.json();
+                if (data.error) {
+                    console.error(`API 错误(尝试${attempt+1}):`, data.error);
+                    this.lastError = data.error;
+                    continue;
+                }
+
+                const text = (data.text || '').trim();
+                if (!text) {
+                    this.lastError = '返回内容为空';
+                    continue;
+                }
+
+                console.log(`AI返回(尝试${attempt+1}):`, text.substring(0, 200));
+
+                // 提取 JSON — 贪婪匹配最外层花括号
+                const jsonMatch = text.match(/\{[^{}]*"from"\s*:\s*\[.*?\].*?"to"\s*:\s*\[.*?\].*?\}/);
+                if (!jsonMatch) {
+                    console.error(`无法提取JSON(尝试${attempt+1}):`, text.substring(0, 100));
+                    this.lastError = '返回格式不正确，重试中...';
+                    continue;
+                }
+
+                const move = JSON.parse(jsonMatch[0]);
+                const isLegal = legalMoves.some(m =>
+                    m.from[0] === move.from[0] && m.from[1] === move.from[1] &&
+                    m.to[0] === move.to[0] && m.to[1] === move.to[1]
+                );
+
+                if (isLegal) {
+                    this.thinking = false;
+                    return { from: move.from, to: move.to, reason: move.reason || '' };
+                } else {
+                    console.error(`非法走法(尝试${attempt+1}):`, move);
+                    this.lastError = '返回了非法走法，重试中...';
+                    continue;
+                }
+            } catch (e) {
+                console.error(`API调用异常(尝试${attempt+1}):`, e);
+                this.lastError = e.message;
+                continue;
             }
-
-            const data = await response.json();
-            if (data.error) {
-                console.error('API 错误:', data.error);
-                this.thinking = false;
-                return null;
-            }
-
-            const text = (data.text || '').trim();
-
-            // 提取 JSON
-            const jsonMatch = text.match(/\{[\s\S]*?\}/);
-            if (!jsonMatch) {
-                console.error('Claude 返回格式错误:', text);
-                this.thinking = false;
-                return null;
-            }
-
-            const move = JSON.parse(jsonMatch[0]);
-            // 验证走法合法性
-            const isLegal = legalMoves.some(m =>
-                m.from[0] === move.from[0] && m.from[1] === move.from[1] &&
-                m.to[0] === move.to[0] && m.to[1] === move.to[1]
-            );
-
-            this.thinking = false;
-            if (isLegal) {
-                return { from: move.from, to: move.to, reason: move.reason };
-            } else {
-                console.error('Claude 返回了非法走法:', move);
-                return null;
-            }
-        } catch (e) {
-            console.error('Claude API 调用失败:', e);
-            this.thinking = false;
-            return null;
         }
+
+        this.thinking = false;
+        this.lastError = this.lastError || '3次尝试均失败';
+        return null;
     }
 
     recordMove(from, to) {
